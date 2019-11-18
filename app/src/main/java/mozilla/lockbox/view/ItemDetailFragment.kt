@@ -104,36 +104,6 @@ class ItemDetailFragment : BackableFragment(), ItemDetailView {
             updatePasswordVisibility(value)
         }
 
-    override fun showPopup() {
-        val wrapper = ContextThemeWrapper(context, R.style.PopupKebabMenu)
-        val popupMenu = PopupMenu(
-            wrapper, // context
-            this.kebabMenuButton, // anchor
-            Gravity.END, // gravity
-            R.attr.popupWindowStyle, // styleAttr
-            R.style.PopupKebabMenu // styleRes
-        )
-        popupMenu.setOnMenuItemClickListener { item ->
-            when (item?.itemId) {
-                R.id.edit -> {
-                    (editClicks as PublishSubject).onNext(Unit)
-                    true
-                }
-                R.id.delete -> {
-                    (deleteClicks as PublishSubject).onNext(Unit)
-                    true
-                }
-                else -> false
-            }
-        }
-
-        popupMenu.inflate(R.menu.item_detail_menu)
-
-        val builder = popupMenu.menu as MenuBuilder
-        builder.setOptionalIconsVisible(true)
-        popupMenu.show()
-    }
-
     @SuppressLint("InflateParams")
     override fun showPopupWindow() {
         val popupView = LayoutInflater.from(context).inflate(R.layout.popup_menu, null)
