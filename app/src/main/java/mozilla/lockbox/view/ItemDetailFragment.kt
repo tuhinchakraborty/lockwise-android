@@ -6,6 +6,7 @@
 
 package mozilla.lockbox.view
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.text.InputType
 import android.text.TextUtils
@@ -15,6 +16,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.StringRes
@@ -103,13 +106,12 @@ class ItemDetailFragment : BackableFragment(), ItemDetailView {
     override fun showPopup() {
         val wrapper = ContextThemeWrapper(context, R.style.PopupKebabMenu)
         val popupMenu = PopupMenu(
-            wrapper,
-            this.kebabMenuButton,
-            Gravity.END,
-            R.attr.popupWindowStyle,
-            R.style.PopupKebabMenu
+            wrapper, // context
+            this.kebabMenuButton, // anchor
+            Gravity.END, // gravity
+            R.attr.popupWindowStyle, // styleAttr
+            R.style.PopupKebabMenu // styleRes
         )
-
         popupMenu.setOnMenuItemClickListener { item ->
             when (item?.itemId) {
                 R.id.edit -> {
@@ -129,6 +131,54 @@ class ItemDetailFragment : BackableFragment(), ItemDetailView {
         val builder = popupMenu.menu as MenuBuilder
         builder.setOptionalIconsVisible(true)
         popupMenu.show()
+    }
+
+    @SuppressLint("InflateParams")
+    override fun showPopupWindow() {
+        val popupView = LayoutInflater.from(context).inflate(R.layout.popup_menu, null)
+        val wrapContent = LinearLayout.LayoutParams.WRAP_CONTENT
+
+        val popupWindow = PopupWindow(popupView, wrapContent, wrapContent, true)
+
+        val offset = resources.getDimensionPixelOffset(R.dimen.popup_menu_offset)
+
+        popupWindow.elevation = resources.getDimension(R.dimen.popup_menu_offset)
+        popupWindow.height = resources.getDimensionPixelSize(R.dimen.popup_menu_height)
+
+        popupWindow.contentView = LayoutInflater.from(context).inflate(R.layout.popup_menu, null)
+
+//        val editItem: TextView = popupWindow.contentView.findViewById(R.id.edit)
+//        editItem.height = resources.getDimensionPixelSize(R.dimen.popup_menu_item_height)
+
+
+        popupWindow.showAsDropDown(
+            this.kebabMenuButton, // anchor
+            offset,
+            offset,
+            Gravity.END // gravity
+        )
+
+        val contentView = popupWindow.contentView
+        val menuItems = listOf<TextView>(contentView.findViewById(R.id.edit),
+            contentView.findViewById(R.id.delete))
+
+        // set up item menu
+        for (item in menuItems) {
+            item.height = resources.getDimensionPixelSize(R.dimen.popup_menu_item_height)
+            item.gravity = Gravity.START
+            item.compoundDrawablePadding = resources.getDimensionPixelSize(R.dimen.drawable_padding)
+        }
+
+        popupView.setOnClickListener { item ->
+            when (item.id) {
+                R.id.edit -> {
+                    (editClicks as PublishSubject).onNext(Unit)
+                }
+                R.id.delete -> {
+                    (deleteClicks as PublishSubject).onNext(Unit)
+                }
+            }
+        }
     }
 
     private fun updatePasswordVisibility(visible: Boolean) {

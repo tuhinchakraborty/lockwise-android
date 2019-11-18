@@ -22,4 +22,10 @@
     <dimen name="onboarding_text_size">15sp</dimen>
     <dimen name="lock_icon_top_margin">238dp</dimen>
     <dimen name="menu_elevation">8dp</dimen>
+    <dimen name="popup_menu_offset">8dp</dimen>
+    <dimen name="popup_menu_height">82dp</dimen>
+    <dimen name="popup_menu_item_height">32dp</dimen>
+    <dimen name="popup_menu_top_padding">12dp</dimen>
+    <dimen name="popup_menu_bottom_padding">14dp</dimen>
+    <dimen name="drawable_padding">8dp</dimen>
 </resources>

@@ -45,6 +45,7 @@ interface ItemDetailView {
     fun hideKebabMenu()
     fun updateItem(item: ItemDetailViewModel)
     fun showPopup()
+    fun showPopupWindow()
     fun showToastNotification(@StringRes strId: Int)
     fun handleNetworkError(networkErrorVisibility: Boolean)
 //    val retryNetworkConnectionClicks: Observable<Unit>
@@ -170,7 +171,8 @@ class ItemDetailPresenter(
 
         view.kebabMenuClicks
             .subscribe {
-                view.showPopup()
+//                view.showPopup()
+                view.showPopupWindow()
             }
             .addTo(compositeDisposable)
     }

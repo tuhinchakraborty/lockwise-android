@@ -63,6 +63,7 @@ open class AccountStore(
     private val securePreferences: SecurePreferences = SecurePreferences.shared,
     private val timingSupport: SystemTimingSupport = DeviceSystemTimingSupport.shared
 ) : ContextStore {
+
     companion object {
         val shared by lazy { AccountStore() }
     }
