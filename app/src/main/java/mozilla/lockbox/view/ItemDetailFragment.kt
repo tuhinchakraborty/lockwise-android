@@ -31,6 +31,7 @@ import kotlinx.android.synthetic.main.fragment_item_detail.*
 import kotlinx.android.synthetic.main.fragment_item_detail.view.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import mozilla.lockbox.R
+import mozilla.lockbox.log
 import mozilla.lockbox.model.ItemDetailViewModel
 import mozilla.lockbox.presenter.ItemDetailPresenter
 import mozilla.lockbox.presenter.ItemDetailView
@@ -140,45 +141,58 @@ class ItemDetailFragment : BackableFragment(), ItemDetailView {
 
         val popupWindow = PopupWindow(popupView, wrapContent, wrapContent, true)
 
-        val offset = resources.getDimensionPixelOffset(R.dimen.popup_menu_offset)
+        val xOffset = resources.getDimensionPixelOffset(R.dimen.popup_menu_xoffset)
+        val yOffset = resources.getDimensionPixelOffset(R.dimen.popup_menu_yoffset)
 
-        popupWindow.elevation = resources.getDimension(R.dimen.popup_menu_offset)
+        popupWindow.elevation = resources.getDimension(R.dimen.menu_elevation)
         popupWindow.height = resources.getDimensionPixelSize(R.dimen.popup_menu_height)
+//        popupWindow.enterTransition = resources.getAnimation(R.anim.slide_in_bottom)
 
         popupWindow.contentView = LayoutInflater.from(context).inflate(R.layout.popup_menu, null)
 
-//        val editItem: TextView = popupWindow.contentView.findViewById(R.id.edit)
-//        editItem.height = resources.getDimensionPixelSize(R.dimen.popup_menu_item_height)
-
-
         popupWindow.showAsDropDown(
             this.kebabMenuButton, // anchor
-            offset,
-            offset,
-            Gravity.END // gravity
+            xOffset,
+            yOffset,
+            Gravity.END
         )
 
-        val contentView = popupWindow.contentView
-        val menuItems = listOf<TextView>(contentView.findViewById(R.id.edit),
-            contentView.findViewById(R.id.delete))
-
         // set up item menu
+        val contentView = popupWindow.contentView
+
+        val topPadding = resources.getDimensionPixelSize(R.dimen.popup_menu_top_padding)
+        val bottomPadding = resources.getDimensionPixelSize(R.dimen.popup_menu_bottom_padding)
+        val sidePadding = resources.getDimensionPixelSize(R.dimen.popup_menu_side_padding)
+
+        contentView.setPadding(sidePadding, topPadding, sidePadding, bottomPadding)
+
+        val menuItems = listOf<TextView>(
+            contentView.findViewById(R.id.edit),
+            contentView.findViewById(R.id.delete)
+        )
+
         for (item in menuItems) {
             item.height = resources.getDimensionPixelSize(R.dimen.popup_menu_item_height)
-            item.gravity = Gravity.START
+            item.gravity = Gravity.CENTER_VERTICAL
             item.compoundDrawablePadding = resources.getDimensionPixelSize(R.dimen.drawable_padding)
+            item.setBackgroundColor(resources.getColor(R.color.menu_item_selected, null))
+            setListeners(item)
         }
+    }
 
-        popupView.setOnClickListener { item ->
-            when (item.id) {
+    private fun setListeners(item: TextView) {
+        item.setOnClickListener {
+            when (it.id) {
                 R.id.edit -> {
                     (editClicks as PublishSubject).onNext(Unit)
                 }
                 R.id.delete -> {
                     (deleteClicks as PublishSubject).onNext(Unit)
                 }
+                else -> { log.info("Not edit or delete. Id = ${item.id}")}
             }
         }
+
     }
 
     private fun updatePasswordVisibility(visible: Boolean) {
