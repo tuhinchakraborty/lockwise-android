@@ -20,6 +20,7 @@ import mozilla.appservices.logins.ServerPassword
 import mozilla.appservices.logins.SyncAuthInvalidException
 import mozilla.appservices.logins.SyncUnlockInfo
 import mozilla.components.service.sync.logins.AsyncLoginsStorage
+import mozilla.lockbox.action.AccountAction
 import mozilla.lockbox.action.DataStoreAction
 import mozilla.lockbox.action.LifecycleAction
 import mozilla.lockbox.action.SentryAction
@@ -33,6 +34,7 @@ import mozilla.lockbox.support.DataStoreSupport
 import mozilla.lockbox.support.FxASyncDataStoreSupport
 import mozilla.lockbox.support.Optional
 import mozilla.lockbox.support.TimingSupport
+import java.lang.Exception
 import kotlin.coroutines.CoroutineContext
 
 @ExperimentalCoroutinesApi
@@ -100,17 +102,22 @@ open class DataStore(
                 }
             }
             .addTo(compositeDisposable)
+        val resetObservable = lifecycleStore.lifecycleEvents
+            .filter { it == LifecycleAction.ForceAccountReset }
+            .map { DataStoreAction.InvalidAccount }
 
         // register for actions
         dispatcher.register
             .filterByType(DataStoreAction::class.java)
+            .mergeWith(resetObservable)
             .subscribe { action ->
                 when (action) {
                     is DataStoreAction.Lock -> lock()
                     is DataStoreAction.Unlock -> unlock()
                     is DataStoreAction.Sync -> sync()
                     is DataStoreAction.Touch -> touch(action.id)
-                    is DataStoreAction.Reset -> reset()
+                    is DataStoreAction.Reset,
+                       DataStoreAction.InvalidAccount -> reset()
                     is DataStoreAction.UpdateSyncCredentials -> updateCredentials(action.syncCredentials)
                     is DataStoreAction.Delete -> delete(action.item)
                     is DataStoreAction.UpdateItemDetail -> update(action.item)
@@ -118,6 +125,7 @@ open class DataStore(
                 }
             }
             .addTo(compositeDisposable)
+
 
         lifecycleStore.lifecycleEvents
             .filter { this.background.contains(it) }
@@ -316,22 +324,27 @@ open class DataStore(
         // ideally, we don't sync unless we are connected to the network
         syncStateSubject.accept(SyncState.Syncing)
 
-        backend.sync(syncConfig)
-            .asSingle(coroutineContext)
-            .map {
-                log.debug("Hashed UID: $it")
-            }
-            .doOnEvent { _, _ ->
-                syncStateSubject.accept(SyncState.NotSyncing)
-            }
-            .subscribe({
-                this.updateList(it)
-                dispatcher.dispatch(DataStoreAction.SyncSuccess)
-            }, {
-                this.pushError(it)
-                dispatcher.dispatch(DataStoreAction.SyncError(it.message.orEmpty()))
-            })
-            .addTo(compositeDisposable)
+        try {
+            backend.sync(syncConfig)
+                .asSingle(coroutineContext)
+                .map {
+                    log.debug("Hashed UID: $it")
+                }
+                .doOnEvent { _, _ ->
+                    syncStateSubject.accept(SyncState.NotSyncing)
+                }
+                .subscribe({
+                    this.updateList(it)
+                    dispatcher.dispatch(DataStoreAction.SyncSuccess)
+                }, {
+                    this.pushError(it)
+                    dispatcher.dispatch(DataStoreAction.SyncError(it.message.orEmpty()))
+                })
+                .addTo(compositeDisposable)
+        } catch (e: Exception) {
+            log.error("Trying to sync...", e)
+        }
+
     }
 
     // item list management
@@ -426,10 +439,15 @@ open class DataStore(
         if (stateSubject.value != State.Unprepared &&
             stateSubject.value != null
         ) {
-            backend.wipeLocal()
-                .asSingle(coroutineContext)
-                .subscribe({}, this::pushError)
-                .addTo(compositeDisposable)
+            try {
+                backend.wipeLocal()
+                    .asSingle(coroutineContext)
+                    .subscribe({}, this::pushError)
+                    .addTo(compositeDisposable)
+            } catch (e: Exception) {
+                log.error("Trying to connect...", e)
+            }
+
         }
         this.support = support
         this.backend = support.createLoginsStorage()

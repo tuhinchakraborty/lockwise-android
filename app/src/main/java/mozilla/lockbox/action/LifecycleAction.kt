@@ -35,5 +35,10 @@ enum class LifecycleAction(
     // TODO: Add a TelemetryEventMethod for upgrading
     Upgrade(TelemetryEventMethod.startup, TelemetryEventObject.app),
     UserReset(TelemetryEventMethod.tap, TelemetryEventObject.settings_reset),
-    UseTestData(TelemetryEventMethod.tap, TelemetryEventObject.settings_reset) // only used in Debug.
+    UseTestData(TelemetryEventMethod.tap, TelemetryEventObject.settings_reset), // only used in Debug
+
+    /**
+     * Emitted when the account is invalid based on changes outside of the app (e.g. password changes).
+     */
+    ForceAccountReset(TelemetryEventMethod.invalid_account, TelemetryEventObject.account_reset)
 }

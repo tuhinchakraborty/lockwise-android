@@ -109,9 +109,9 @@ sealed class DialogAction(
 
     object AccountChangedDialog : DialogAction(
         DialogViewModel(
-            R.string.account_changed_dialog_title,
-            R.string.account_changed_dialog_text,
-            R.string.ok
+            R.string.confirming_its_you_title,
+            R.string.confirming_its_you_text,
+            R.string.continue_button
         )
     )
 }

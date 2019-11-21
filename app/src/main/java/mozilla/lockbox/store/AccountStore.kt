@@ -13,6 +13,7 @@ import android.os.Looper
 import android.webkit.CookieManager
 import android.webkit.WebStorage
 import android.webkit.WebView
+import androidx.lifecycle.Lifecycle
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers.mainThread
 import io.reactivex.disposables.CompositeDisposable
@@ -23,11 +24,13 @@ import io.reactivex.subjects.Subject
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.rx2.asMaybe
 import kotlinx.coroutines.rx2.asSingle
 import mozilla.appservices.fxaclient.FxaException
 import mozilla.components.concept.sync.AccessTokenInfo
 import mozilla.components.concept.sync.Avatar
+import mozilla.components.concept.sync.OAuthAccount
 import mozilla.components.concept.sync.OAuthScopedKey
 import mozilla.components.concept.sync.Profile
 import mozilla.components.service.fxa.ServerConfig
@@ -46,6 +49,7 @@ import mozilla.lockbox.model.FxASyncCredentials
 import mozilla.lockbox.model.SyncCredentials
 import mozilla.lockbox.support.Constant
 import mozilla.lockbox.support.DeviceSystemTimingSupport
+import mozilla.lockbox.support.FxAccountObserver
 import mozilla.lockbox.support.Optional
 import mozilla.lockbox.support.SecurePreferences
 import mozilla.lockbox.support.SystemTimingSupport
@@ -95,9 +99,12 @@ open class AccountStore(
 
     private var fxa: FirefoxAccount? = null
 
+    private var accountObserver = FxAccountObserver()
+
     open val loginURL: Observable<String> = ReplaySubject.createWithSize(1)
 
-    private val syncCredentials: Observable<Optional<SyncCredentials>> = ReplaySubject.createWithSize(1)
+    private val syncCredentials: Observable<Optional<SyncCredentials>> =
+        ReplaySubject.createWithSize(1)
     open val profile: Observable<Optional<Profile>> = ReplaySubject.createWithSize(1)
 
     private lateinit var context: Context
@@ -106,7 +113,7 @@ open class AccountStore(
 
     init {
         val resetObservable = lifecycleStore.lifecycleEvents
-            .filter { it == LifecycleAction.UserReset }
+            .filter { it == LifecycleAction.UserReset || it == LifecycleAction.ForceAccountReset }
             .map { AccountAction.Reset }
 
         val useTestData = lifecycleStore.lifecycleEvents
@@ -152,12 +159,12 @@ open class AccountStore(
             account.authInfo.kSync,
             account.authInfo.kXCS
         )
-        ?.let {
-            it.asSingle(coroutineContext)
-                .map { true }
-                .subscribe(this::populateAccountInformation, this::pushError)
-                .addTo(compositeDisposable)
-        }
+            ?.let {
+                it.asSingle(coroutineContext)
+                    .map { true }
+                    .subscribe(this::populateAccountInformation, this::pushError)
+                    .addTo(compositeDisposable)
+            }
     }
 
     private fun detectAccount() {
@@ -167,7 +174,8 @@ open class AccountStore(
             } else {
                 try {
                     this.fxa = FirefoxAccount.fromJSONString(accountJSON)
-                } catch (e: FxaException) {
+                    authenticateAccount(fxa)
+                } catch (e: Exception) {
                     pushError(e)
                 }
                 generateLoginURL()
@@ -176,6 +184,10 @@ open class AccountStore(
         } ?: run {
             this.generateNewFirefoxAccount()
         }
+    }
+
+    private fun authenticateAccount(fxa: FirefoxAccount?) {
+        accountObserver.onAuthenticated(fxa as OAuthAccount, true)
     }
 
     private fun populateTestAccountInformation(isNew: Boolean) {
@@ -191,10 +203,10 @@ open class AccountStore(
     private fun populateAccountInformation(isNew: Boolean) {
         val profileSubject = profile as Subject
 
-        val fxa = fxa ?: return
-        securePreferences.putString(Constant.Key.firefoxAccount, fxa.toJSONString())
+        fxa = hasAccountBeenChanged()
+        securePreferences.putString(Constant.Key.firefoxAccount, fxa!!.toJSONString())
 
-        fxa.getProfileAsync()
+        fxa!!.getProfileAsync()
             .asMaybe(coroutineContext)
             .delay(1L, TimeUnit.SECONDS)
             .map { it.asOptional() }
@@ -205,12 +217,16 @@ open class AccountStore(
             accessTokenInfoFromJSON(JSONObject(it))
         }
 
-        token?.let { handleAccessToken(it, isNew) } ?: tokenRotationHandler.post { fetchFreshToken(isNew) }
+        token?.let { handleAccessToken(it, isNew) } ?: tokenRotationHandler.post {
+            fetchFreshToken(
+                isNew
+            )
+        }
     }
 
     private fun fetchFreshToken(isNewLogin: Boolean = false) {
-        val fxa = fxa ?: return
-        fxa.getAccessTokenAsync(Constant.FxA.oldSyncScope)
+        fxa = hasAccountBeenChanged()
+        fxa!!.getAccessTokenAsync(Constant.FxA.oldSyncScope)
             .asMaybe(coroutineContext)
             .delay(1L, TimeUnit.SECONDS)
             .subscribe({ token ->
@@ -253,7 +269,10 @@ open class AccountStore(
         }, msDelay)
     }
 
-    private fun generateSyncCredentials(oauthInfo: AccessTokenInfo, isNew: Boolean): Observable<Optional<SyncCredentials>> {
+    private fun generateSyncCredentials(
+        oauthInfo: AccessTokenInfo,
+        isNew: Boolean
+    ): Observable<Optional<SyncCredentials>> {
         return Observable.just(Unit)
             .observeOn(Schedulers.io())
             .map {
@@ -269,7 +288,7 @@ open class AccountStore(
             val config = ServerConfig.release(Constant.FxA.clientID, Constant.FxA.redirectUri)
             fxa = FirefoxAccount(config)
             generateLoginURL()
-        } catch (e: FxaException) {
+        } catch (e: Exception) {
             this.pushError(e)
         }
         (syncCredentials as Subject).onNext(Optional(null))
@@ -277,17 +296,31 @@ open class AccountStore(
     }
 
     private fun generateLoginURL() {
-        val fxa = fxa ?: return
+        fxa = hasAccountBeenChanged()
 
-        fxa.beginOAuthFlowAsync(Constant.FxA.scopes)
+        fxa!!.beginOAuthFlowAsync(Constant.FxA.scopes)
             .asMaybe(coroutineContext)
             .map { it.url }
             .subscribe((this.loginURL as Subject)::onNext, this::pushError)
             .addTo(compositeDisposable)
     }
 
+    private fun hasAccountBeenChanged(): FirefoxAccount? {
+        if (fxa != null) {
+            // did fxa exist, and does it still exist now?
+            // this should be checked every time we attempt to access fxa, if it's not too slow
+            // this is going to be a network request
+            log.info("Account is not fucked up ...")
+            return fxa
+        }
+        else {
+            log.info("Something fucked up ...")
+            return null
+        }
+    }
+
     private fun oauthLogin(url: String) {
-        val fxa = fxa ?: return
+        fxa = hasAccountBeenChanged()
 
         val uri = Uri.parse(url)
         val codeQP = uri.getQueryParameter("code")
@@ -295,13 +328,20 @@ open class AccountStore(
 
         codeQP?.let { code ->
             stateQP?.let { state ->
-                fxa.completeOAuthFlowAsync(code, state)
+                fxa!!.completeOAuthFlowAsync(code, state)
                     .asSingle(coroutineContext)
                     .map { true }
-                    .subscribe(this::populateAccountInformation, this::pushError)
+                    .subscribe (
+                        {
+                            populateAccountInformation(it)
+//                            accountObserver.onAuthenticated(account = fxa!!, newAccount = it)
+                        },
+                        { pushError(it) }
+                    )
                     .addTo(compositeDisposable)
             }
         }
+
     }
 
     private fun clear() {
@@ -332,6 +372,9 @@ open class AccountStore(
     }
 
     private fun removeDeviceFromFxA() {
+
+        fxa = hasAccountBeenChanged()
+
         if (fxa != null) {
             fxa!!.disconnectAsync()
                 .asSingle(coroutineContext)
@@ -373,9 +416,19 @@ open class AccountStore(
                 "FxA error populating account information. Message: " + it.message,
                 it
             )
-            is FxaException.Unspecified -> log.error("Unspecified FxA error. Message: " + it.message, it)
-            is FxaException.Network -> log.error("FxA network error. Message: " + it.message, it)
-            is FxaException.Panic -> log.error("FxA error. Message: " + it.message, it)
+            is FxaException.Unspecified -> log.error(
+                "Unspecified FxA error. Message: " + it.message,
+                it
+            )
+            is FxaException.Network -> log.error(
+                "FxA network error. Message: " + it.message,
+                it
+            )
+            is FxaException.Panic -> log.error(
+                "FxA error. Message: " + it.message,
+                it
+            )
+            else -> log.error("FxA error: " + it.message, it)
         }
 
         dispatcher.dispatch(SentryAction(it))
@@ -383,16 +436,16 @@ open class AccountStore(
 }
 
 private fun AccessTokenInfo.toJSONObject() = JSONObject()
-        .put("scope", scope)
-        .put("token", token)
-        .put("expiresAt", expiresAt)
-        .put("key", key?.toJSONObject())
+    .put("scope", scope)
+    .put("token", token)
+    .put("expiresAt", expiresAt)
+    .put("key", key?.toJSONObject())
 
 private fun OAuthScopedKey.toJSONObject() = JSONObject()
-        .put("kty", kty)
-        .put("scope", scope)
-        .put("kid", kid)
-        .put("k", k)
+    .put("kty", kty)
+    .put("scope", scope)
+    .put("kid", kid)
+    .put("k", k)
 
 private fun accessTokenInfoFromJSON(obj: JSONObject): AccessTokenInfo? {
     return AccessTokenInfo(

@@ -286,13 +286,13 @@
 
 
     <!-- This is the title of the error message dialog box that is shown .... -->
-    <string name="account_changed_dialog_title">You have been logged out.</string>
+    <string name="confirming_its_you_title">Confirming that it\'s you.</string>
 
     <!-- This is the error message that is shown in a dialog box when a user is logged out. -->
-    <string name="account_changed_dialog_text">Your account has been changed on another device. Please log in again.</string>
+    <string name="confirming_its_you_text">Because your password was recently changed, you\'ll need to sign back in to your account.</string>
 
     <!-- This is the button text on the dialog box when a user is logged out. -->
-    <string name="ok">OK</string>
+    <string name="continue_button">Continue</string>
 
 
 

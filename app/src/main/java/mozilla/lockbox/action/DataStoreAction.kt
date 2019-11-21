@@ -103,4 +103,10 @@ sealed class DataStoreAction(
         TelemetryEventMethod.autofill_add,
         TelemetryEventObject.datastore
     )
+
+    /**
+     * Dispatched when account problems are detected.
+     */
+    object InvalidAccount : DataStoreAction(TelemetryEventMethod.invalid_account, TelemetryEventObject.datastore)
+
 }
