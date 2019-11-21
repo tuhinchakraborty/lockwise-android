@@ -106,4 +106,12 @@ sealed class DialogAction(
             ItemDetailAction.EndEditing(itemId)
         )
     )
+
+    object AccountChangedDialog : DialogAction(
+        DialogViewModel(
+            R.string.account_changed_dialog_title,
+            R.string.account_changed_dialog_text,
+            R.string.ok
+        )
+    )
 }

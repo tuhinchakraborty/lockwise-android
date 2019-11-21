@@ -281,5 +281,20 @@
 
     <!-- This is the error message that is shown in edit or create view when input text for password is not valid. -->
     <string name="password_invalid_text">Password cannot be empty</string>
+    <!-- This is the error message that is shown in edit or create view when a credential with the same username already exists for that domain. -->
     <string name="username_duplicate_exists">A login with that username already exists</string>
+
+
+    <!-- This is the title of the error message dialog box that is shown .... -->
+    <string name="account_changed_dialog_title">You have been logged out.</string>
+
+    <!-- This is the error message that is shown in a dialog box when a user is logged out. -->
+    <string name="account_changed_dialog_text">Your account has been changed on another device. Please log in again.</string>
+
+    <!-- This is the button text on the dialog box when a user is logged out. -->
+    <string name="ok">OK</string>
+
+
+
+
 </resources>
