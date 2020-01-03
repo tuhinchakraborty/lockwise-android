@@ -8,6 +8,7 @@ package mozilla.lockbox.presenter
 
 import android.text.TextUtils
 import android.webkit.URLUtil
+import androidx.annotation.StringRes
 import io.reactivex.rxkotlin.addTo
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import mozilla.lockbox.R
@@ -19,7 +20,9 @@ import mozilla.lockbox.flux.Dispatcher
 import mozilla.lockbox.store.ItemDetailStore
 import mozilla.lockbox.support.asOptional
 
-interface CreateItemView : ItemMutationView
+interface CreateItemView : ItemMutationView {
+    fun getToastAction(@StringRes strId: Int? = null): RouteAction
+}
 
 @ExperimentalCoroutinesApi
 class CreateItemPresenter(
@@ -59,7 +62,10 @@ class CreateItemPresenter(
     }
 
     override fun endEditingAction(): List<Action> {
-        return listOf(RouteAction.ItemList)
+        return listOf(
+            RouteAction.ItemList,
+            view.getToastAction(R.string.successful_create_toast)
+        )
     }
 
     override fun hostnameError(inputText: String) =

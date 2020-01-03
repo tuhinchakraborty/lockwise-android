@@ -132,7 +132,9 @@ open class ItemDetailStore(
     private fun saveCreateChanges() {
         itemToSave.take(1)
             .filterNotNull()
-            .map { DataStoreAction.CreateItem(it) }
+            .map {
+                DataStoreAction.CreateItem(it)
+            }
             .subscribe(dispatcher::dispatch)
             .addTo(sessionDisposable)
         stopCreating()
