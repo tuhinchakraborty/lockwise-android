@@ -15,14 +15,13 @@ import mozilla.lockbox.R
 import mozilla.lockbox.action.DialogAction
 import mozilla.lockbox.action.ItemDetailAction
 import mozilla.lockbox.action.RouteAction
+import mozilla.lockbox.action.ToastNotificationAction
 import mozilla.lockbox.flux.Action
 import mozilla.lockbox.flux.Dispatcher
 import mozilla.lockbox.store.ItemDetailStore
 import mozilla.lockbox.support.asOptional
 
-interface CreateItemView : ItemMutationView {
-    fun getToastAction(@StringRes strId: Int? = null): RouteAction
-}
+interface CreateItemView : ItemMutationView
 
 @ExperimentalCoroutinesApi
 class CreateItemPresenter(
@@ -64,7 +63,7 @@ class CreateItemPresenter(
     override fun endEditingAction(): List<Action> {
         return listOf(
             RouteAction.ItemList,
-            view.getToastAction(R.string.successful_create_toast)
+            ToastNotificationAction.ShowSuccessfulCreateToast
         )
     }
 
